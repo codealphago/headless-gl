@@ -115,7 +115,7 @@
         {
         'action_name': 'build_angle',
         'inputs': [
-          'scripts/build_angle.sh'
+          'tools/build_angle.sh'
         ],
         'outputs': [
           '<(module_root_dir)/node_modules/angle/out/$(BUILDTYPE)/obj/libANGLE.a',
@@ -127,7 +127,7 @@
           '<(module_root_dir)/node_modules/angle/out/$(BUILDTYPE)/obj/libEGL_static.a',
           '<(module_root_dir)/node_modules/angle/out/$(BUILDTYPE)/obj/libGLESv2_static.a'
         ],
-        'action': [ 'scripts/build_angle.sh', '$(BUILDTYPE)' ],
+        'action': [ 'tools/build_angle.sh', '$(BUILDTYPE)' ],
         }
       ]
     }
