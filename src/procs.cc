@@ -82,6 +82,8 @@ void WebGLRenderingContext::initPointers(){
 	glStencilOp=reinterpret_cast<PFNGLSTENCILOPPROC>(eglGetProcAddress("glStencilOp"));
 	glStencilOpSeparate=reinterpret_cast<PFNGLSTENCILOPSEPARATEPROC>(eglGetProcAddress("glStencilOpSeparate"));
 	glScissor=reinterpret_cast<PFNGLSCISSORPROC>(eglGetProcAddress("glScissor"));
+	glMapBufferRange=reinterpret_cast<PFNGLMAPBUFFERRANGEPROC>(eglGetProcAddress("glMapBufferRange"));
+	glUnmapBuffer=reinterpret_cast<PFNGLUNMAPBUFFERPROC>(eglGetProcAddress("glUnmapBuffer"));
 	glBindRenderbuffer=reinterpret_cast<PFNGLBINDRENDERBUFFERPROC>(eglGetProcAddress("glBindRenderbuffer"));
 	glGenRenderbuffers=reinterpret_cast<PFNGLGENRENDERBUFFERSPROC>(eglGetProcAddress("glGenRenderbuffers"));
 	glFramebufferRenderbuffer=reinterpret_cast<PFNGLFRAMEBUFFERRENDERBUFFERPROC>(eglGetProcAddress("glFramebufferRenderbuffer"));
@@ -120,6 +122,7 @@ void WebGLRenderingContext::initPointers(){
 	glGetBufferParameteriv=reinterpret_cast<PFNGLGETBUFFERPARAMETERIVPROC>(eglGetProcAddress("glGetBufferParameteriv"));
 	glGetFloatv=reinterpret_cast<PFNGLGETFLOATVPROC>(eglGetProcAddress("glGetFloatv"));
 	glGetIntegerv=reinterpret_cast<PFNGLGETINTEGERVPROC>(eglGetProcAddress("glGetIntegerv"));
+	glGetInteger64v=reinterpret_cast<PFNGLGETINTEGER64VPROC>(eglGetProcAddress("glGetInteger64v"));
 	glGetBooleanv=reinterpret_cast<PFNGLGETBOOLEANVPROC>(eglGetProcAddress("glGetBooleanv"));
 	glGetProgramiv=reinterpret_cast<PFNGLGETPROGRAMIVPROC>(eglGetProcAddress("glGetProgramiv"));
 	glGetTexParameteriv=reinterpret_cast<PFNGLGETTEXPARAMETERIVPROC>(eglGetProcAddress("glGetTexParameteriv"));
@@ -127,4 +130,9 @@ void WebGLRenderingContext::initPointers(){
 	glGetVertexAttribPointerv=reinterpret_cast<PFNGLGETVERTEXATTRIBPOINTERVPROC>(eglGetProcAddress("glGetVertexAttribPointerv"));
 	glGetString=reinterpret_cast<PFNGLGETSTRINGPROC>(eglGetProcAddress("glGetString"));
 	glGetError=reinterpret_cast<PFNGLGETERRORPROC>(eglGetProcAddress("glGetError"));
+
+	glFenceSync=reinterpret_cast<PFNGLFENCESYNCPROC>(eglGetProcAddress("glFenceSync"));
+	glDeleteSync=reinterpret_cast<PFNGLDELETESYNCPROC>(eglGetProcAddress("glDeleteSync"));
+	glClientWaitSync=reinterpret_cast<PFNGLCLIENTWAITSYNCPROC>(eglGetProcAddress("glClientWaitSync"));
+	glIsSync=reinterpret_cast<PFNGLISSYNCPROC>(eglGetProcAddress("glIsSync"));
 }

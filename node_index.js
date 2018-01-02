@@ -1,6 +1,7 @@
 var bits = require('bit-twiddle')
 var webgl = require('./webgl')
 var wrap = require('./wrap')
+var Canvas = require('canvas')
 
 var CONTEXT_COUNTER = 0
 
@@ -66,6 +67,7 @@ function createContext (width, height, options) {
   gl._textures = {}
   gl._framebuffers = {}
   gl._renderbuffers = {}
+  gl._buffersByTarget = {}
 
   gl._activeProgram = null
   gl._activeFramebuffer = null
@@ -125,5 +127,29 @@ function createContext (width, height, options) {
 
   return wrap(gl)
 }
+
+// Create an adapter layer to emulate a browser and Canvas (using node-canvas)
+
+var oldGetContext = Canvas.prototype.getContext
+
+Canvas.prototype.getContext = function (contextType, contextAttributes) {
+  if (contextType === '2d') {
+    return oldGetContext.call(this, contextType, contextAttributes)
+  } else if (contextType in { 'webgl': true, 'webgl2': true, 'experimental-webgl': true }) {
+    return createContext(this.width || 1, this.height || 1, contextAttributes)
+  }
+}
+
+global.document = {}
+
+global.document.createElement = function (type) {
+  if (type !== 'canvas') {
+    return null
+  }
+
+  return new Canvas()
+}
+
+document = global.document
 
 module.exports = createContext

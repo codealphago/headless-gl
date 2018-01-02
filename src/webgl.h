@@ -11,7 +11,8 @@
 #include <v8.h>
 
 #include <EGL/egl.h>
-#include <GLES2/gl2.h>
+#include <EGL/eglext.h>
+#include <GLES3/gl3.h>
 #include <GLES2/gl2ext.h>
 
 enum GLObjectType {
@@ -20,7 +21,7 @@ enum GLObjectType {
   GLOBJECT_TYPE_PROGRAM,
   GLOBJECT_TYPE_RENDERBUFFER,
   GLOBJECT_TYPE_SHADER,
-  GLOBJECT_TYPE_TEXTURE,
+  GLOBJECT_TYPE_TEXTURE
 };
 
 enum GLContextState {
@@ -100,6 +101,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   //Context validation
   static WebGLRenderingContext* ACTIVE;
   bool setActive();
+  bool clearActive();
 
   //Unpacks a buffer full of pixels into memory
   unsigned char* unpackPixels(
@@ -178,6 +180,7 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   static NAN_METHOD(FramebufferTexture2D);
   static NAN_METHOD(BufferData);
   static NAN_METHOD(BufferSubData);
+  static NAN_METHOD(GetBufferSubData);
   static NAN_METHOD(BlendEquation);
   static NAN_METHOD(BlendFunc);
   static NAN_METHOD(EnableVertexAttribArray);
@@ -259,6 +262,8 @@ struct WebGLRenderingContext : public node::ObjectWrap {
   static NAN_METHOD(GetSupportedExtensions);
   static NAN_METHOD(GetExtension);
   static NAN_METHOD(CheckFramebufferStatus);
+
+  static NAN_METHOD(GetBufferSubDataAsync);
 
   static NAN_METHOD(FrontFace);
   static NAN_METHOD(SampleCoverage);

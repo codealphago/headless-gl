@@ -317,8 +317,8 @@ function precheckFramebufferStatus (framebuffer) {
   }
 
   if (colorAttachment instanceof WebGLTexture) {
-    if (colorAttachment._format !== gl.RGBA ||
-        colorAttachment._type !== gl.UNSIGNED_BYTE) {
+    if ((colorAttachment._format !== gl.RGBA && colorAttachment._format !== gl.RED) ||
+    (colorAttachment._type !== gl.UNSIGNED_BYTE && colorAttachment._type !== gl.FLOAT)) {
       return gl.FRAMEBUFFER_INCOMPLETE_ATTACHMENT
     }
     var level = framebuffer._attachmentLevel[gl.COLOR_ATTACHMENT0]
@@ -439,12 +439,14 @@ function formatSize (internalformat) {
   switch (internalformat) {
     case gl.ALPHA:
     case gl.LUMINANCE:
+    case gl.RED:
       return 1
     case gl.LUMINANCE_ALPHA:
       return 2
     case gl.RGB:
       return 3
     case gl.RGBA:
+    case gl.RGB32F:
       return 4
   }
   return 0
@@ -580,12 +582,7 @@ function restoreError (context, lastError) {
 }
 
 function getActiveBuffer (context, target) {
-  if (target === gl.ARRAY_BUFFER) {
-    return context._activeArrayBuffer
-  } else if (target === gl.ELEMENT_ARRAY_BUFFER) {
-    return context._activeElementArrayBuffer
-  }
-  return null
+  return context._buffersByTarget[target] || null
 }
 
 function checkVertexAttribState (context, maxIndex) {
@@ -674,7 +671,10 @@ gl.getSupportedExtensions = function getSupportedExtensions () {
   var exts = [
     'ANGLE_instanced_arrays',
     'STACKGL_resize_drawingbuffer',
-    'STACKGL_destroy_context'
+    'STACKGL_destroy_context',
+    'EXT_color_buffer_float',
+    'WEBGL_lose_context',
+    'WEBGL_get_buffer_sub_data_async'
   ]
 
   var supportedExts = _getSupportedExtensions.call(this)
@@ -783,7 +783,7 @@ function createANGLEInstancedArrays (context) {
       return
     }
 
-    var elementBuffer = context._activeElementArrayBuffer
+    var elementBuffer = context._buffersByTarget[gl.ELEMENT_ARRAY_BUFFER]
     if (!elementBuffer) {
       setError(context, gl.INVALID_OPERATION)
       return
@@ -925,6 +925,19 @@ gl.getExtension = function getExtension (name) {
     case 'oes_element_index_uint':
       ext = getOESElementIndexUint(this)
       break
+    case 'oes_texture_float':
+      ext = 'OES_texture_float'
+      break
+    case 'ext_color_buffer_float':
+      ext = 'EXT_color_buffer_float'
+      break
+    case 'webgl_lose_context':
+      ext = new STACKGL_destroy_context()
+      ext.loseContext = this.destroy.bind(this)
+      break
+    case 'webgl_get_buffer_sub_data_async':
+      ext = new WEBGL_get_buffer_sub_data_async(this)
+      break
   }
   if (ext) {
     this._extensions[str] = ext
@@ -1012,7 +1025,13 @@ gl.bindBuffer = function bindBuffer (target, buffer) {
     throw new TypeError('bindBuffer(GLenum, WebGLBuffer)')
   }
   if (target !== gl.ARRAY_BUFFER &&
-    target !== gl.ELEMENT_ARRAY_BUFFER) {
+    target !== gl.ELEMENT_ARRAY_BUFFER &&
+    target !== gl.COPY_READ_BUFFER &&
+    target !== gl.COPY_WRITE_BUFFER &&
+    target !== gl.TRANSFORM_FEEDBACK_BUFFER &&
+    target !== gl.UNIFORM_BUFFER &&
+    target !== gl.PIXEL_PACK_BUFFER &&
+    target !== gl.PIXEL_UNPACK_BUFFER) {
     setError(this, gl.INVALID_ENUM)
     return
   }
@@ -1033,13 +1052,8 @@ gl.bindBuffer = function bindBuffer (target, buffer) {
     return
   }
 
-  if (target === gl.ARRAY_BUFFER) {
-    switchActiveBuffer(this._activeArrayBuffer, buffer)
-    this._activeArrayBuffer = buffer
-  } else {
-    switchActiveBuffer(this._activeElementArrayBuffer, buffer)
-    this._activeElementArrayBuffer = buffer
-  }
+  switchActiveBuffer(this._buffersByTarget[target], buffer)
+  this._buffersByTarget[target] = buffer
 }
 
 var _bindRenderbuffer = gl.bindRenderbuffer
@@ -1305,7 +1319,13 @@ gl.bufferData = function bufferData (target, data, usage) {
   }
 
   if (target !== gl.ARRAY_BUFFER &&
-    target !== gl.ELEMENT_ARRAY_BUFFER) {
+    target !== gl.ELEMENT_ARRAY_BUFFER &&
+    target !== gl.COPY_READ_BUFFER &&
+    target !== gl.COPY_WRITE_BUFFER &&
+    target !== gl.TRANSFORM_FEEDBACK_BUFFER &&
+    target !== gl.UNIFORM_BUFFER &&
+    target !== gl.PIXEL_PACK_BUFFER &&
+    target !== gl.PIXEL_UNPACK_BUFFER) {
     setError(this, gl.INVALID_ENUM)
     return
   }
@@ -1377,7 +1397,13 @@ gl.bufferSubData = function bufferSubData (target, offset, data) {
   offset |= 0
 
   if (target !== gl.ARRAY_BUFFER &&
-    target !== gl.ELEMENT_ARRAY_BUFFER) {
+    target !== gl.ELEMENT_ARRAY_BUFFER &&
+    target !== gl.COPY_READ_BUFFER &&
+    target !== gl.COPY_WRITE_BUFFER &&
+    target !== gl.TRANSFORM_FEEDBACK_BUFFER &&
+    target !== gl.UNIFORM_BUFFER &&
+    target !== gl.PIXEL_PACK_BUFFER &&
+    target !== gl.PIXEL_UNPACK_BUFFER) {
     setError(this, gl.INVALID_ENUM)
     return
   }
@@ -1422,6 +1448,69 @@ gl.bufferSubData = function bufferSubData (target, offset, data) {
   }
 
   _bufferSubData.call(
+    this,
+    target,
+    offset,
+    u8Data)
+}
+
+var _getBufferSubData = gl.getBufferSubData
+gl.getBufferSubData = function getBufferSubData (target, offset, data) {
+  target |= 0
+  offset |= 0
+
+  if (target !== gl.ARRAY_BUFFER &&
+    target !== gl.ELEMENT_ARRAY_BUFFER &&
+    target !== gl.COPY_READ_BUFFER &&
+    target !== gl.COPY_WRITE_BUFFER &&
+    target !== gl.TRANSFORM_FEEDBACK_BUFFER &&
+    target !== gl.UNIFORM_BUFFER &&
+    target !== gl.PIXEL_PACK_BUFFER &&
+    target !== gl.PIXEL_UNPACK_BUFFER) {
+    setError(this, gl.INVALID_ENUM)
+    return
+  }
+
+  if (data === null) {
+    return
+  }
+
+  if (!data || typeof data !== 'object') {
+    setError(this, gl.INVALID_VALUE)
+    return
+  }
+
+  var active = getActiveBuffer(this, target)
+  if (!active) {
+    setError(this, gl.INVALID_OPERATION)
+    return
+  }
+
+  if (offset < 0 || offset >= active._size) {
+    setError(this, gl.INVALID_VALUE)
+    return
+  }
+
+  var u8Data = null
+  if (isTypedArray(data)) {
+    u8Data = unpackTypedArray(data)
+  } else if (data instanceof ArrayBuffer) {
+    u8Data = new Uint8Array(data)
+  } else {
+    setError(this, gl.INVALID_VALUE)
+    return
+  }
+
+  if (offset + u8Data.length > active._size) {
+    setError(this, gl.INVALID_VALUE)
+    return
+  }
+
+  if (target === gl.ELEMENT_ARRAY_BUFFER) {
+    active._elements.set(u8Data, offset)
+  }
+
+  _getBufferSubData.call(
     this,
     target,
     offset,
@@ -1742,11 +1831,12 @@ gl.deleteBuffer = function deleteBuffer (buffer) {
     return
   }
 
-  if (this._activeArrayBuffer === buffer) {
-    this.bindBuffer(gl.ARRAY_BUFFER, null)
-  }
-  if (this._activeElementArrayBuffer === buffer) {
-    this.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, null)
+  for (var id in this._buffersByTarget) {
+    var curBuf = this._buffersByTarget[id]
+    if (curBuf === buffer) {
+      this.bindBuffer(parseInt(id), null)
+      break
+    }
   }
 
   for (var i = 0; i < this._vertexAttribs.length; ++i) {
@@ -2015,8 +2105,8 @@ function endAttrib0Hack (context) {
     attrib._pointerOffset)
   _vertexAttribDivisor.call(context, 0, attrib._divisor)
   _disableVertexAttribArray.call(context, 0)
-  if (context._activeArrayBuffer) {
-    _bindBuffer.call(context, gl.ARRAY_BUFFER, context._activeArrayBuffer._)
+  if (context._buffersByTarget[gl.ARRAY_BUFFER]) {
+    _bindBuffer.call(context, gl.ARRAY_BUFFER, context._buffersByTarget[gl.ARRAY_BUFFER]._)
   } else {
     _bindBuffer.call(context, gl.ARRAY_BUFFER, 0)
   }
@@ -2099,7 +2189,7 @@ gl.drawElements = function drawElements (mode, count, type, ioffset) {
     return
   }
 
-  var elementBuffer = this._activeElementArrayBuffer
+  var elementBuffer = this._buffersByTarget[gl.ELEMENT_ARRAY_BUFFER]
   if (!elementBuffer) {
     setError(this, gl.INVALID_OPERATION)
     return
@@ -2463,9 +2553,9 @@ gl.getParameter = function getParameter (pname) {
   pname |= 0
   switch (pname) {
     case gl.ARRAY_BUFFER_BINDING:
-      return this._activeArrayBuffer
+      return this._buffersByTarget[gl.ARRAY_BUFFER]
     case gl.ELEMENT_ARRAY_BUFFER_BINDING:
-      return this._activeElementArrayBuffer
+      return this._buffersByTarget[gl.ELEMENT_ARRAY_BUFFER]
     case gl.CURRENT_PROGRAM:
       return this._activeProgram
     case gl.FRAMEBUFFER_BINDING:
@@ -2613,7 +2703,13 @@ gl.getBufferParameter = function getBufferParameter (target, pname) {
   target |= 0
   pname |= 0
   if (target !== gl.ARRAY_BUFFER &&
-    target !== gl.ELEMENT_ARRAY_BUFFER) {
+    target !== gl.ELEMENT_ARRAY_BUFFER &&
+    target !== gl.COPY_READ_BUFFER &&
+    target !== gl.COPY_WRITE_BUFFER &&
+    target !== gl.TRANSFORM_FEEDBACK_BUFFER &&
+    target !== gl.UNIFORM_BUFFER &&
+    target !== gl.PIXEL_PACK_BUFFER &&
+    target !== gl.PIXEL_UNPACK_BUFFER) {
     setError(this, gl.INVALID_ENUM)
     return null
   }
@@ -3176,15 +3272,21 @@ gl.readPixels = function readPixels (x, y, width, height, format, type, pixels) 
   var i
   var j
   var k
+  var bufferOffset = 0
 
   x |= 0
   y |= 0
   width |= 0
   height |= 0
 
+  if (typeof pixels === 'number') {
+    bufferOffset = pixels || 0
+    pixels = null
+  }
+
   if (format === gl.RGB ||
     format === gl.ALPHA ||
-    type !== gl.UNSIGNED_BYTE) {
+   (type !== gl.UNSIGNED_BYTE && type !== gl.FLOAT)) {
     setError(this, gl.INVALID_OPERATION)
     return
   } else if (format !== gl.RGBA) {
@@ -3193,12 +3295,13 @@ gl.readPixels = function readPixels (x, y, width, height, format, type, pixels) 
   } else if (
     width < 0 ||
     height < 0 ||
-    !(pixels instanceof Uint8Array)) {
+    (pixels != null && !(pixels instanceof Uint8Array) && !(pixels instanceof Float32Array))) {
     setError(this, gl.INVALID_VALUE)
     return
   }
 
   if (!framebufferOk(this)) {
+    setError(this, gl.INVALID_OPERATION)
     return
   }
 
@@ -3209,8 +3312,56 @@ gl.readPixels = function readPixels (x, y, width, height, format, type, pixels) 
 
   var imageSize = rowStride * (height - 1) + width * 4
   if (imageSize <= 0) {
+    setError(this, gl.INVALID_OPERATION)
     return
   }
+
+  var pixelPackBuffer = this._buffersByTarget[gl.PIXEL_PACK_BUFFER]
+
+  if (!pixels) {
+    if (!pixelPackBuffer) {
+      setError(this, gl.INVALID_OPERATION)
+      return
+    }
+
+    if (bufferOffset < 0) {
+      setError(this, gl.INVALID_VALUE)
+      return
+    }
+
+    if (bufferOffset >= pixelPackBuffer._size) {
+      setError(this, gl.INVALID_OPERATION)
+      return
+    }
+
+    if (bufferOffset > 0) {
+      // TODO: Support a non-zero offset
+      setError(this, gl.INVALID_VALUE)
+      return
+    }
+
+    if (imageSize > pixelPackBuffer._size) {
+      setError(this, gl.INVALID_OPERATION)
+      return
+    }
+
+    _readPixels.call(
+      this,
+      x,
+      y,
+      width,
+      height,
+      format,
+      type,
+      null)
+    return
+  }
+
+  if (pixelPackBuffer) {
+    setError(this, gl.INVALID_OPERATION)
+    return
+  }
+
   if (pixels.length < imageSize) {
     setError(this, gl.INVALID_VALUE)
     return
@@ -3272,7 +3423,8 @@ gl.readPixels = function readPixels (x, y, width, height, format, type, pixels) 
         nheight,
         format,
         type,
-        subPixels)
+        subPixels,
+        0)
 
       var offset = 4 * (nx - x) + (ny - y) * rowStride
       for (j = 0; j < nheight; ++j) {
@@ -3430,6 +3582,7 @@ function computePixelSize (context, type, internalformat) {
     return 0
   }
   switch (type) {
+    case gl.FLOAT:
     case gl.UNSIGNED_BYTE:
       return pixelSize
     case gl.UNSIGNED_SHORT_5_6_5:
@@ -3489,7 +3642,9 @@ function convertPixels (pixels) {
       return new Uint8Array(pixels)
     } else if (pixels instanceof Uint8Array ||
       pixels instanceof Uint16Array ||
-      pixels instanceof Uint8ClampedArray) {
+      pixels instanceof Uint8ClampedArray ||
+    pixels instanceof Float32Array ||
+    pixels instanceof Float64Array) {
       return unpackTypedArray(pixels)
     } else if (pixels instanceof Buffer) {
       return new Uint8Array(pixels)
@@ -3511,8 +3666,11 @@ function checkFormat (format) {
     format === gl.ALPHA ||
     format === gl.LUMINANCE_ALPHA ||
     format === gl.LUMINANCE ||
+    format === gl.R32F ||
+    format === gl.RED ||
     format === gl.RGB ||
-    format === gl.RGBA)
+    format === gl.RGBA ||
+    format === gl.RGBA32F)
 }
 
 var extractImageData = function (pixels) {
@@ -3591,7 +3749,7 @@ gl.texImage2D = function texImage2D (
   }
 
   var texture = getTexImage(this, target)
-  if (!texture || format !== internalformat) {
+  if (!texture) {
     setError(this, gl.INVALID_OPERATION)
     return
   }
@@ -4082,7 +4240,7 @@ gl.vertexAttribPointer = function vertexAttribPointer (
     return
   }
 
-  if (this._activeArrayBuffer === null) {
+  if (!this._buffersByTarget[gl.ARRAY_BUFFER]) {
     setError(this, gl.INVALID_OPERATION)
     return
   }
@@ -4115,13 +4273,13 @@ gl.vertexAttribPointer = function vertexAttribPointer (
   var attrib = this._vertexAttribs[index]
 
   if (attrib._pointerBuffer &&
-    attrib._pointerBuffer !== this._activeArrayBuffer) {
+    attrib._pointerBuffer !== this._buffersByTarget[gl.ARRAY_BUFFER]) {
     attrib._pointerBuffer._refCount -= 1
     checkDelete(attrib._pointerBuffer)
   }
 
-  this._activeArrayBuffer._refCount += 1
-  attrib._pointerBuffer = this._activeArrayBuffer
+  this._buffersByTarget[gl.ARRAY_BUFFER]._refCount += 1
+  attrib._pointerBuffer = this._buffersByTarget[gl.ARRAY_BUFFER]
   attrib._pointerSize = size * byteSize
   attrib._pointerOffset = offset
   attrib._pointerStride = stride || (size * byteSize)
@@ -4244,4 +4402,25 @@ gl.compressedTexImage2D = function () {
 
 gl.compressedTexSubImage2D = function () {
   // TODO not yet implemented
+}
+
+function WEBGL_get_buffer_sub_data_async (context) {
+  this.context = context
+}
+
+WEBGL_get_buffer_sub_data_async.prototype.getBufferSubDataAsync = function (target, srcByteOffset, dstBuffer, dstOffset, length) {
+  var self = this
+
+  if (dstOffset || length) {
+    throw new Error('dstOffset and length parameters not supported')
+  }
+  return new Promise(function (resolve, reject) {
+    self.context.getBufferSubDataAsync(target, srcByteOffset, dstBuffer, function (err) {
+      if (err) {
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+  })
 }

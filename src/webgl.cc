@@ -3,6 +3,7 @@
 #include <iostream>
 
 #include "webgl.h"
+#include "GetBufferSubDataWorker.h"
 
 bool                   WebGLRenderingContext::HAS_DISPLAY = false;
 EGLDisplay             WebGLRenderingContext::DISPLAY;
@@ -91,9 +92,10 @@ WebGLRenderingContext::WebGLRenderingContext(
 
   //Create context
   EGLint contextAttribs[] = {
-    EGL_CONTEXT_CLIENT_VERSION, 2,
+    EGL_CONTEXT_CLIENT_VERSION, 3,
     EGL_NONE
   };
+
   context = eglCreateContext(DISPLAY, config, EGL_NO_CONTEXT, contextAttribs);
   if (context == EGL_NO_CONTEXT) {
     state = GLCONTEXT_STATE_ERROR;
@@ -158,6 +160,21 @@ bool WebGLRenderingContext::setActive() {
     return false;
   }
   ACTIVE = this;
+  return true;
+}
+
+bool WebGLRenderingContext::clearActive() {
+  if (state != GLCONTEXT_STATE_OK) {
+    return false;
+  }
+  if (this != ACTIVE) {
+    return false;
+  }
+  if (!eglMakeCurrent(DISPLAY, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
+    state = GLCONTEXT_STATE_ERROR;
+    return false;
+  }
+  ACTIVE = NULL;
   return true;
 }
 
@@ -1049,6 +1066,24 @@ GL_METHOD(BufferSubData) {
   Nan::TypedArrayContents<char> array(info[2]);
 
   (inst->glBufferSubData)(target, offset, array.length(), *array);
+}
+
+
+GL_METHOD(GetBufferSubData) {
+  GL_BOILERPLATE;
+
+  GLenum target = info[0]->Int32Value();
+  GLint offset  = info[1]->Int32Value();
+  Nan::TypedArrayContents<char> array(info[2]);
+  GLint length = array.length();
+
+  printf("mapping range\n");
+  void *mappedBuf = inst->glMapBufferRange(target, offset, length, GL_MAP_READ_BIT);
+  printf("copying data\n");
+  memcpy(*array, mappedBuf, length);
+  printf("unmapping buffer\n");
+  inst->glUnmapBuffer(target);
+  printf("GetBufferSubData done\n");
 }
 
 
@@ -2058,4 +2093,15 @@ GL_METHOD(CheckFramebufferStatus) {
   info.GetReturnValue().Set(
     Nan::New<v8::Integer>(
       static_cast<int>((inst->glCheckFramebufferStatus)(target))));
+}
+
+GL_METHOD(GetBufferSubDataAsync) {
+  GL_BOILERPLATE;
+
+  GLenum target = info[0]->Int32Value();
+  GLint offset  = info[1]->Int32Value();
+  // Nan::TypedArrayContents<char> array(info[2]);
+  Nan::Callback *callback = new Nan::Callback(Nan::To<v8::Function>(info[3]).ToLocalChecked());
+
+  Nan::AsyncQueueWorker(new GetBufferSubDataWorker(callback, info.This(), inst, target, offset, info[2]));
 }

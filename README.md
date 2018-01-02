@@ -1,128 +1,58 @@
-# gl
+# deeplearn-gl
 
 [![Travis CI](https://travis-ci.org/stackgl/headless-gl.svg?branch=master)](https://travis-ci.org/stackgl/headless-gl)
 [![Appveyor](https://ci.appveyor.com/api/projects/status/github/stackgl/headless-gl?svg=true)](https://ci.appveyor.com/project/mikolalysenko/headless-gl)
 [![js-standard-style](https://img.shields.io/badge/code%20style-standard-brightgreen.svg)](http://standardjs.com/)
 
-`gl` lets you create a WebGL context in [node.js](https://nodejs.org/en/) without making a window or loading a full browser environment.
+`deeplearn-gl` lets you create a WebGL context in [node.js](https://nodejs.org/en/) without making a window or loading a full browser environment.
 
-It aspires to fully conform to the [WebGL 1.0.3 specification](https://www.khronos.org/registry/webgl/specs/1.0.3/).
-
-## Warning!
-
-This module is not actively developed. It's maintained enough to be working on all recent Node versions, but is unlikely to get new features or substantial bug fixes. If you want to take over the maintenance, please let us know in your pull requests!
+This fork provides enough capability to run deeplearn.js using the GPU (with GPU processing asynchronous to the node execution).
 
 ## Example
 
 ```javascript
-//Create context
-var width   = 64
-var height  = 64
-var gl = require('gl')(width, height, { preserveDrawingBuffer: true })
+var gl = require('deeplearn-gl')
+var dl = require('deeplearn');
+var math = new dl.NDArrayMath('webgl');
+var size = 3000;
 
-//Clear screen to red
-gl.clearColor(1, 0, 0, 1)
-gl.clear(gl.COLOR_BUFFER_BIT)
+var start = Date.now();
 
-//Write output as a PPM formatted image
-var pixels = new Uint8Array(width * height * 4)
-gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels)
-process.stdout.write(['P3\n# gl.ppm\n', width, " ", height, '\n255\n'].join(''))
-for(var i=0; i<pixels.length; i+=4) {
-  for(var j=0; j<3; ++j) {
-    process.stdout.write(pixels[i+j] + ' ')
-  }
-}
+var a = dl.Array2D.ones([size, size]);
+var b = dl.Array2D.ones([size, size]);
+
+var result = math.matMul(a, b);
+
+var promise = result.data().then(function(data) {
+  console.log("done in ", (Date.now()-start)/1000, "seconds with value", data[0]);
+}).catch(console.log);
 ```
+
+## Warning!
+
+This is forked from a module that is not actively developed.
 
 ## Install
-Installing `headless-gl` on a supported platform is a snap using one of the prebuilt binaries.  Using [npm](https://www.npmjs.com/) run the command,
+Installing `deeplearn-gl` currently has only been tested on OSX.  You can install it using [npm](https://www.npmjs.com/) run the command,
 
 ```
-npm install gl
+npm install deeplearn-gl
 ```
 
 And you are good to go!  If your system is not supported, then please see the [development](#system-dependencies) section on how to configure your build environment.  Patches to improve support are always welcome!
 
 ## API
 
-`headless-gl` exports exactly one function which you can use to create a WebGL context,
-
-#### `var gl = require('gl')(width, height[, options])`
-Creates a new `WebGLRenderingContext` with the given parameters.
-
-* `width` is the width of the drawing buffer
-* `height` is the height of the drawing buffer
-* `options` is an optional object whose properties are the context attributes for the WebGLRendering context
-
-**Returns** A new `WebGLRenderingContext` object
+`deeplearn-gl` exposes a global `document.createElement` which supports creating canvas elements
+for drawing (using node-canvas) or for GL (using headless-gl and the angleproject)
 
 ### Extensions
 
-In addition to all the usual WebGL methods, `headless-gl` exposes some custom extensions to make it easier to manage WebGL context resources in a server side environment:
-
-#### `STACKGL_resize_drawingbuffer`
-
-This extension provides a mechanism to resize the drawing buffer of a WebGL context once it is created.
-
-In a pure DOM implementation, this method would implemented by resizing the WebGLContext's canvas element by modifying its `width/height` properties.  This canvas manipulation is not possible in headless-gl, since a headless context doesn't have a DOM or a canvas element associated to it.
-
-#### Example
-
-```javascript
-var assert = require('assert')
-var gl = require('gl')(10, 10)
-assert(gl.drawingBufferHeight === 10 && gl.drawingBufferWidth === 10)
-
-var ext = gl.getExtension('STACKGL_resize_drawingbuffer')
-ext.resize(20, 5)
-assert(gl.drawingBufferHeight === 20 && gl.drawingBufferWidth === 5)
-```
-
-#### IDL
-```
-[NoInterfaceObject]
-interface STACKGL_resize_drawingbuffer {
-    void resize(GLint width, GLint height);
-};
-```
-
-#### `ext.resize(width, height)`
-Resizes the drawing buffer of a WebGL rendering context
-
-* `width` is the new width of the drawing buffer for the context
-* `height` is the new height of the drawing buffer for the context
-
-### `STACKGL_destroy_context`
-
-Destroys the WebGL context immediately, reclaiming all resources associated with it.
-
-For long running jobs, garbage collection of contexts is often not fast enough.  To prevent the system from becoming overloaded with unused contexts, you can force the system to reclaim a WebGL context immediately by calling `.destroy()`.
-
-#### Example
-
-```javascript
-var gl = require('gl')(10, 10)
-
-var ext = gl.getExtension('STACKGL_destroy_context')
-ext.destroy()
-```
-
-#### IDL
-
-```
-[NoInterfaceObject]
-interface STACKGL_destroy_context {
-    void destroy();
-};
-```
-
-#### `gl.getExtension('STACKGL_destroy_context').destroy()`
-Immediately destroys the context and all associated resources.
+In addition to all the usual WebGL methods, `headless-gl` exposes some extensions that allow deeplearn-js to function more efficiently.
 
 ## System dependencies
 
-In most cases installing `headless-gl` from npm should just work.  However, if you run into problems you might need to adjust your system configuration and make sure all your dependencies are up to date.  For general information on building native modules, see the [`node-gyp`](https://github.com/nodejs/node-gyp) documentation.
+On OSX installing `deeplearn-gl` from npm should just work.  However, if you run into problems you might need to adjust your system configuration and make sure all your dependencies are up to date.  For general information on building native modules, see the [`node-gyp`](https://github.com/nodejs/node-gyp) documentation.
 
 #### Mac OS X
 
