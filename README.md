@@ -39,7 +39,26 @@ Installing `deeplearn-gl` currently has only been tested on OSX.  You can instal
 npm install deeplearn-gl
 ```
 
-And you are good to go!  If your system is not supported, then please see the [development](#system-dependencies) section on how to configure your build environment.  Patches to improve support are always welcome!
+This package uses node-canvas to emulate regular canvas behavior (for loading images, etc.).
+So, unless previously installed, you'll _need_ __Cairo__ and __Pango__. For system-specific installation view the [Wiki](https://github.com/Automattic/node-canvas/wiki/_pages).
+
+Currently the minimum version of node required is __4.0.0__
+
+You can quickly install the dependencies by using the command for your OS:
+
+OS | Command
+----- | -----
+OS X | Using [Homebrew](https://brew.sh/):<br/>`brew install pkg-config cairo pango libpng jpeg giflib`<br/><br/>Using [MacPorts](https://www.macports.org/):<br/>`port install pkgconfig cairo pango libpng jpeg giflib`
+Ubuntu | `sudo apt-get install libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev build-essential g++`
+Fedora | `sudo yum install cairo cairo-devel cairomm-devel libjpeg-turbo-devel pango pango-devel pangomm pangomm-devel giflib-devel`
+Solaris | `pkgin install cairo pango pkg-config xproto renderproto kbproto xextproto`
+Windows | [Instructions on our wiki](https://github.com/Automattic/node-canvas/wiki/Installation---Windows)
+
+**Mac OS X v10.11+:** If you have recently updated to Mac OS X v10.11+ and are experiencing trouble when compiling, run the following command: `xcode-select --install`. Read more about the problem [on Stack Overflow](http://stackoverflow.com/a/32929012/148072).
+
+`node-canvas` can sometimes be tricky to get installed right. If the install fails, this might also help before you try again: `export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig:/opt/X11/lib/pkgconfig`.
+
+If your system is not supported, then please see the [development](#system-dependencies) section on how to configure your build environment.  Patches to improve support are always welcome!
 
 ## API
 
@@ -58,6 +77,7 @@ On OSX installing `deeplearn-gl` from npm should just work.  However, if you run
 
 * [Python 2.7](https://www.python.org/)
 * [XCode](https://developer.apple.com/xcode/)
+* Cairo
 
 #### Ubuntu/Debian
 
@@ -120,24 +140,9 @@ Interacting with `Xvfb` requires you to start it on the background and to execut
 
     xvfb-run -s "-ac -screen 0 1280x1024x24" <node program>
 
-### Does headless-gl work in a browser?
-
-Yes, with [browserify](http://browserify.org/).  The `STACKGL_destroy_context` and `STACKGL_resize_drawingbuffer` extensions are emulated as well.
-
 ### How are `<image>` and `<video>` elements implemented?
 
-They aren't for now.  If you want to upload data to a texture, you will need to unpack the pixels into a `Uint8Array` and feed it into `texImage2D`.  To help reading and saving images, you should check out the following modules:
-
-* [`get-pixels`](https://www.npmjs.com/package/get-pixels)
-* [`save-pixels`](https://www.npmjs.com/package/save-pixels)
-
-### What extensions are supported?
-
-Only the following for now:
-
-* [`STACKGL_resize_drawingbuffer`](https://github.com/stackgl/headless-gl#stackgl_resize_drawingbuffer)
-* [`STACKGL_destroy_context`](https://github.com/stackgl/headless-gl#stackgl_destroy_context)
-* [`ANGLE_instanced_arrays`](https://www.khronos.org/registry/webgl/extensions/ANGLE_instanced_arrays/)
+Using node-canvas images are supported (but this hasn't been tested with deeplearnjs yet).
 
 ### How can I keep up to date with what has changed in headless-gl?
 
@@ -149,6 +154,10 @@ Despite the name [node-webgl](https://github.com/mikeseven/node-webgl) doesn't a
 
 `headless-gl` on the other hand just implements WebGL.  It is built on top of [ANGLE](https://bugs.chromium.org/p/angleproject/issues/list) and passes the full Khronos ARB conformance suite, which means it works exactly the same on all supported systems.  This makes it a great choice for running on a server or in a command line tool.  You can use it to run tests, generate images or perform GPGPU computations using shaders.
 
+### Why use this thing instead of `headless-gl`?
+
+[headless-gl](https://github.com/stackgl/headless-gl) doesn't support float buffers (which dramatically improve the performance of deeplearnjs) or async buffer retrieval (which allows node to keep processing while the GPU is working in the background). It's also built using a very old version of `angle`.
+
 ### Why use this thing instead of [electron](http://electron.atom.io/)?
 
 Electron is fantastic if you are writing a desktop application or if you need a full DOM implementation.  On the other hand, because it is a larger dependency electron is more difficult to set up and configure in a server-side/CI environment. `headless-gl` is more modular in the sense that it just implements WebGL and nothing else.  As a result creating a `headless-gl` context takes just a few milliseconds on most systems, while spawning a full electron instance can take upwards of 15-30 seconds. If you are using WebGL in a command line interface or need to execute WebGL in a service, `headless-gl` might be a more efficient and simpler choice.
@@ -157,10 +166,8 @@ Electron is fantastic if you are writing a desktop application or if you need a 
 
 After you have your [system dependencies installed](#system-dependencies), do the following:
 
-1. Clone this repo: `git clone git@github.com:stackgl/headless-gl.git`
+1. Clone this repo: `git clone git@github.com:dfoody/headless-gl.git`
 1. Switch to the headless gl directory: `cd headless-gl`
-1. Initialize the angle submodule: `git submodule init`
-1. Update the angle submodule: `git submodule update`
 1. Install npm dependencies: `npm install`
 1. Run node-gyp to generate build scripts: `npm run rebuild`
 

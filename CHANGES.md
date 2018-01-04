@@ -1,5 +1,9 @@
 # headless-gl change log
 
+## 4.0.6
+
+* Uses updated version of `angle` and works with `deeplearnjs`
+
 ## 4.0.2
 
 * Now works correctly when running in `electron`
