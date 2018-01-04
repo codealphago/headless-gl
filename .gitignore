@@ -5,6 +5,7 @@ npm-debug.log
 Debug
 *.log
 node_modules
+depot_tools
 prebuilds/*
 angle/build/*
 example/**/*.ppm

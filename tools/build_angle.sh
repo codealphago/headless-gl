@@ -7,7 +7,13 @@ then
 fi
 
 CONFIG=$1
-PATH=$PATH:`pwd`/node_modules/depot_tools/tools
+
+if [ ! -d depot_tools ]
+then
+  git clone https://chromium.googlesource.com/chromium/tools/depot_tools
+fi
+
+PATH=$PATH:`pwd`/depot_tools
 
 if [ ! -d node_modules/angle/src ]
 then
