@@ -19,7 +19,7 @@ if [ ! -d node_modules/angle/src ]
 then
   cd node_modules
   rm -rf angle
-  git clone git@github.com:dfoody/angle.git
+  git clone https://github.com/dfoody/angle.git
   cd ..
 fi
 
